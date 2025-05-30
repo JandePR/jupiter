@@ -1,0 +1,28 @@
+/node_modules
+    /dist
+    /.env
+    /.env*.local
+    /.env*.development
+    /.env*.test
+    /.env*.production
+
+    # Log files
+    npm-debug.log*
+    yarn-debug.log*
+    yarn-error.log*
+    pnpm-debug.log*
+
+    # Editor directories and files
+    .idea
+    .vscode
+    *.suo
+    *.ntvs*
+    *.njsproj
+    *.sln
+    *.sw?
+
+    # Optional User-specific files
+    .DS_Store
+    # System Files
+    Thumbs.db
+    ehthumbs.db
