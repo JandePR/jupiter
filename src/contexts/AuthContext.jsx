@@ -16,48 +16,56 @@ import React, { createContext, useState, useEffect, useCallback } from 'react';
       const location = useLocation();
 
       const handleAuthChange = useCallback(async (_event, currentSession) => {
-        setLoading(true);
-        setSession(currentSession);
+        try {
+          setLoading(true);
+          setSession(currentSession);
 
-        if (currentSession?.user) {
-          const profile = await fetchUserProfile(currentSession.user.id);
-          let userName = currentSession.user.email;
-          let userRole = 'client';
+          if (currentSession?.user) {
+            const profile = await fetchUserProfile(currentSession.user.id);
+            let userName = currentSession.user.email;
+            let userRole = 'client';
 
-          if (profile) {
-            userName = profile.full_name || currentSession.user.email;
-            userRole = profile.role || 'client';
+            if (profile) {
+              userName = profile.full_name || currentSession.user.email;
+              userRole = profile.role || 'client';
+            } else {
+              console.warn(`AuthContext (onAuthStateChange): User ${currentSession.user.id} session active but profile data could not be fetched. Defaulting role.`);
+            }
+
+            setUser({
+              ...currentSession.user,
+              user_metadata: {
+                ...currentSession.user.user_metadata,
+                name: userName,
+              },
+            });
+            setRole(userRole);
+
+            if (_event === 'SIGNED_IN') {
+              const defaultPath = userRole?.startsWith('staff') ? '/staff/dashboard' : '/dashboard';
+              const targetPath = location.state?.from?.pathname || defaultPath;
+              navigate(targetPath, { replace: true });
+            }
           } else {
-            console.warn(`AuthContext (onAuthStateChange): User ${currentSession.user.id} session active but profile data could not be fetched. Defaulting role.`);
-          }
-          
-          setUser({
-            ...currentSession.user,
-            user_metadata: {
-              ...currentSession.user.user_metadata,
-              name: userName,
-            },
-          });
-          setRole(userRole);
-
-          if (_event === 'SIGNED_IN') {
-            const defaultPath = userRole?.startsWith('staff') ? '/staff/dashboard' : '/dashboard';
-            const targetPath = location.state?.from?.pathname || defaultPath;
-            navigate(targetPath, { replace: true });
-          }
-        } else {
-          setUser(null);
-          setRole(null);
-          setSession(null); 
-          if (_event === 'SIGNED_OUT' || _event === 'USER_DELETED' || _event === 'TOKEN_REFRESHED_FAILED') {
-            const currentPath = window.location.pathname;
-            const targetLoginPath = currentPath.startsWith('/staff') ? '/staff/login' : '/login';
-            if (currentPath !== targetLoginPath) {
+            setUser(null);
+            setRole(null);
+            setSession(null);
+            if (_event === 'SIGNED_OUT' || _event === 'USER_DELETED' || _event === 'TOKEN_REFRESHED_FAILED') {
+              const currentPath = window.location.pathname;
+              const targetLoginPath = currentPath.startsWith('/staff') ? '/staff/login' : '/login';
+              if (currentPath !== targetLoginPath) {
                 navigate(targetLoginPath, { replace: true });
+              }
             }
           }
+        } catch (error) {
+          console.error('AuthContext: Error in handleAuthChange:', error);
+          setUser(null);
+          setRole(null);
+          setSession(null);
+        } finally {
+          setLoading(false);
         }
-        setLoading(false);
       }, [navigate, location.state]);
 
       useEffect(() => {

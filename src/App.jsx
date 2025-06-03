@@ -14,10 +14,10 @@ import React, { Suspense } from 'react';
     import StaffDashboardPage from '@/pages/staff/StaffDashboardPage';
     import StaffLayout from '@/components/staff/StaffLayout';
     import StaffProtectedRoute from '@/components/staff/StaffProtectedRoute';
-    import StaffManageUsersPage from '@/pages/staff/StaffManageUsersPage';
-    import StaffSettingsPage from '@/pages/staff/StaffSettingsPage';
     
     const StaffCreateProjectPage = React.lazy(() => import('@/pages/staff/StaffCreateProjectPage'));
+    const StaffManageUsersPage = React.lazy(() => import('@/pages/staff/StaffManageUsersPage'));
+    const StaffSettingsPage = React.lazy(() => import('@/pages/staff/StaffSettingsPage'));
 
     function LoadingFallback({ message = "Loading Page..." }) {
       return (
@@ -85,16 +85,18 @@ import React, { Suspense } from 'react';
               </StaffProtectedRoute>
             }
           />
-          <Route 
-            path="/staff/settings"
-            element={
-              <StaffProtectedRoute requiredRolePrefix="staff">
-                <StaffLayout>
-                  <StaffSettingsPage />
-                </StaffLayout>
-              </StaffProtectedRoute>
-            }
-          />
+            <Route
+                path="/staff/settings"
+                element={
+                    <StaffProtectedRoute requiredRolePrefix="staff">
+                        <StaffLayout>
+                            <Suspense fallback={<LoadingFallback message="Loading Settings..." />}>
+                                <StaffSettingsPage />
+                            </Suspense>
+                        </StaffLayout>
+                    </StaffProtectedRoute>
+                }
+            />
 
           {/* Fallback Route */}
           <Route 
