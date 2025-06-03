@@ -142,6 +142,20 @@ const StaffCreateProjectPage = () => {
     );
   }
 
+  if (formError && !projectName && !projectType) {
+    // Show error state if initial data failed to load
+    return (
+        <div className="flex flex-col items-center justify-center h-[calc(100vh-250px)] text-center p-4">
+          <AlertTriangle className="h-16 w-16 text-red-500 mb-4" />
+          <h2 className="text-2xl font-semibold text-slate-700 dark:text-slate-200 mb-2">Failed to Load Form Data</h2>
+          <p className="text-slate-600 dark:text-slate-400 mb-4">{formError}</p>
+          <Button onClick={() => window.location.reload()} className="bg-purple-600 hover:bg-purple-700 text-white">
+            Refresh Page
+          </Button>
+        </div>
+    );
+  }
+
   if (role !== 'staff_admin' && role !== 'staff_manager') {
     return (
         <div className="flex flex-col items-center justify-center h-[calc(100vh-250px)] text-center p-4">
