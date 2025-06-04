@@ -191,6 +191,12 @@ export default defineConfig({
 		},
 		allowedHosts: true,
 	},
+	preview: {
+		cors: true,
+		headers: {
+			'Cross-Origin-Embedder-Policy': 'credentialless',
+		},
+	},
 	resolve: {
 		extensions: ['.jsx', '.js', '.tsx', '.ts', '.json', ],
 		alias: {

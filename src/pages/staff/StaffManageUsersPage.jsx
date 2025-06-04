@@ -46,16 +46,14 @@ const StaffManageUsersPage = () => {
     const fetchUsers = async () => {
         setIsLoading(true);
         try {
-            // Fetch profiles with user data
+            // Fetch profiles - REMOVED created_at from query
             const { data: profiles, error } = await supabase
                 .from('profiles')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('id', { ascending: false });
 
             if (error) throw error;
 
-            // Get auth users data via Edge Function or admin API if available
-            // For now, we'll use the profiles data
             setUsers(profiles || []);
         } catch (error) {
             console.error('Error fetching users:', error);
@@ -129,8 +127,7 @@ const StaffManageUsersPage = () => {
                 .from('profiles')
                 .update({
                     full_name: formData.full_name,
-                    role: formData.role,
-                    updated_at: new Date().toISOString()
+                    role: formData.role
                 })
                 .eq('id', editingUser.id);
 
@@ -166,8 +163,7 @@ const StaffManageUsersPage = () => {
             const { error } = await supabase
                 .from('profiles')
                 .update({
-                    is_active: false,
-                    updated_at: new Date().toISOString()
+                    is_active: false
                 })
                 .eq('id', userId);
 
@@ -393,7 +389,7 @@ const StaffManageUsersPage = () => {
                                         <TableHead>Email</TableHead>
                                         <TableHead>Role</TableHead>
                                         <TableHead>Status</TableHead>
-                                        <TableHead>Created</TableHead>
+                                        <TableHead>User ID</TableHead>
                                         <TableHead>Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -405,23 +401,23 @@ const StaffManageUsersPage = () => {
                                             </TableCell>
                                             <TableCell>{user.email || 'N/A'}</TableCell>
                                             <TableCell>
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeClass(user.role)}`}>
-                          {user.role?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Client'}
-                        </span>
+                                                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeClass(user.role)}`}>
+                                                    {user.role?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Client'}
+                                                </span>
                                             </TableCell>
                                             <TableCell>
                                                 {user.is_active !== false ? (
                                                     <span className="flex items-center text-green-600 dark:text-green-400">
-                            <Check className="h-4 w-4 mr-1" /> Active
-                          </span>
+                                                        <Check className="h-4 w-4 mr-1" /> Active
+                                                    </span>
                                                 ) : (
                                                     <span className="flex items-center text-red-600 dark:text-red-400">
-                            <X className="h-4 w-4 mr-1" /> Inactive
-                          </span>
+                                                        <X className="h-4 w-4 mr-1" /> Inactive
+                                                    </span>
                                                 )}
                                             </TableCell>
-                                            <TableCell className="text-sm text-slate-600 dark:text-slate-400">
-                                                {new Date(user.created_at).toLocaleDateString()}
+                                            <TableCell className="text-xs text-slate-600 dark:text-slate-400">
+                                                {user.id}
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex space-x-1">
