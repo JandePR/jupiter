@@ -3,6 +3,7 @@ import React from 'react';
     import { Textarea } from '@/components/ui/textarea';
     import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
     import { Users } from 'lucide-react';
+import PropTypes from 'prop-types';
 
     const StaffAssignmentFormSection = ({ staffMembers, assignedStaffId, setAssignedStaffId, notes, setNotes }) => {
       return (
@@ -18,8 +19,8 @@ import React from 'react';
                 <SelectValue placeholder="Select staff member" />
               </SelectTrigger>
               <SelectContent className="bg-white dark:bg-slate-800">
-                <SelectItem value="">None</SelectItem>
-                {staffMembers.map(staff => (
+                <SelectItem value="none">None</SelectItem>
+                {(staffMembers || []).map(staff => (
                   <SelectItem key={staff.id} value={staff.id}>{staff.full_name}</SelectItem>
                 ))}
               </SelectContent>
@@ -39,4 +40,23 @@ import React from 'react';
       );
     };
 
-    export default StaffAssignmentFormSection;
+    StaffAssignmentFormSection.propTypes = {
+      staffMembers: PropTypes.arrayOf(
+        PropTypes.shape({
+          id: PropTypes.string.isRequired,
+          full_name: PropTypes.string.isRequired
+        })
+      ).isRequired,
+      assignedStaffId: PropTypes.string,
+      setAssignedStaffId: PropTypes.func.isRequired,
+      notes: PropTypes.string,
+      setNotes: PropTypes.func.isRequired
+    };
+
+StaffAssignmentFormSection.defaultProps = {
+  assignedStaffId: '',
+  notes: '',
+  staffMembers: []
+};
+
+    export default React.memo(StaffAssignmentFormSection);

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, User, Lock, Save, AlertCircle, Check, LogOut } from 'lucide-react';
+import { Settings, User, Lock, Save, AlertCircle, Check, LogOut, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/authHooks';
@@ -152,9 +152,28 @@ const StaffSettingsPage = () => {
             return;
         }
 
+        if (!passwordData.currentPassword) {
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Current password is required.'
+            });
+            return;
+        }
+
         setIsSavingPassword(true);
 
         try {
+            // Verify current password by attempting to sign in
+            const { error: verifyError } = await supabase.auth.signInWithPassword({
+                email: user.email,
+                password: passwordData.currentPassword
+            });
+
+            if (verifyError) {
+                throw new Error('Current password is incorrect.');
+            }
+
             // Update password
             const { error } = await supabase.auth.updateUser({
                 password: passwordData.newPassword
@@ -330,7 +349,7 @@ const StaffSettingsPage = () => {
                                             className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
                                             onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
                                         >
-                                            {showPasswords.current ? '👁️' : '👁️‍🗨️'}
+                                            {showPasswords.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                         </Button>
                                     </div>
                                 </div>
@@ -352,7 +371,7 @@ const StaffSettingsPage = () => {
                                             className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
                                             onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
                                         >
-                                            {showPasswords.new ? '👁️' : '👁️‍🗨️'}
+                                            {showPasswords.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                         </Button>
                                     </div>
                                 </div>
@@ -374,7 +393,7 @@ const StaffSettingsPage = () => {
                                             className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
                                             onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
                                         >
-                                            {showPasswords.confirm ? '👁️' : '👁️‍🗨️'}
+                                            {showPasswords.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                         </Button>
                                     </div>
                                 </div>

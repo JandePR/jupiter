@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/authHooks';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { motion } from 'framer-motion';
-import { Zap, Activity, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Zap, Activity, Clock, CheckCircle, AlertCircle, LayoutDashboard, ListFilter } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 import DashboardHeader from './dashboard-components/DashboardHeader';
+import DashboardSummary from './dashboard-components/DashboardSummary';
 import ProjectFilters from './dashboard-components/ProjectFilters';
 import ProjectTable from './dashboard-components/ProjectTable';
 import { PROJECT_STATUSES } from './create-project-components/utils';
@@ -177,92 +179,111 @@ const StaffDashboardPage = () => {
           <DashboardHeader userRole={role} />
         </motion.div>
 
-        {/* Statistics Cards */}
-        <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-white dark:bg-slate-800 shadow-md hover:shadow-lg transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
-              <Activity className="h-4 w-4 text-purple-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{projectStats.total}</div>
-              <p className="text-xs text-muted-foreground">
-                {role === 'staff_drafter' ? 'Assigned to you' : 'All projects'}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white dark:bg-slate-800 shadow-md hover:shadow-lg transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-              <Clock className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{projectStats.byStatus[PROJECT_STATUSES.IN_PROGRESS] || 0}</div>
-              <p className="text-xs text-muted-foreground">Active projects</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white dark:bg-slate-800 shadow-md hover:shadow-lg transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{projectStats.byStatus[PROJECT_STATUSES.COMPLETED] || 0}</div>
-              <p className="text-xs text-muted-foreground">Finished projects</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white dark:bg-slate-800 shadow-md hover:shadow-lg transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Attention Needed</CardTitle>
-              <AlertCircle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{projectStats.overdue + projectStats.dueSoon}</div>
-              <p className="text-xs text-muted-foreground">
-                {projectStats.overdue > 0 && `${projectStats.overdue} overdue`}
-                {projectStats.overdue > 0 && projectStats.dueSoon > 0 && ', '}
-                {projectStats.dueSoon > 0 && `${projectStats.dueSoon} due soon`}
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
         <motion.div variants={itemVariants}>
-          <Card className="bg-white dark:bg-slate-800 shadow-xl">
-            <CardHeader>
-              <CardTitle className="text-xl text-slate-800 dark:text-slate-100">Project Overview</CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">Filter and manage your projects.</CardDescription>
-              <ProjectFilters
-                  searchTerm={searchTerm}
-                  setSearchTerm={setSearchTerm}
-                  filterStatus={filterStatus}
-                  setFilterStatus={setFilterStatus}
-              />
-            </CardHeader>
-            <CardContent>
-              {filteredProjects.length === 0 ? (
-                  <div className="text-center py-10">
-                    <Zap className="mx-auto h-12 w-12 text-slate-400 dark:text-slate-500 mb-4" />
-                    <p className="text-slate-500 dark:text-slate-400">No projects found matching your criteria.</p>
-                  </div>
-              ) : (
-                  <ProjectTable
-                      projects={filteredProjects}
-                      sortConfig={sortConfig}
-                      handleSort={handleSort}
-                      expandedProjectId={expandedProjectId}
-                      toggleExpandProject={toggleExpandProject}
-                      handleDeleteProject={handleDeleteProject}
-                      userRole={role}
-                      userId={user?.id}
-                      onProjectUpdate={fetchProjects}
+          <Tabs defaultValue="dashboard" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="dashboard" className="flex items-center">
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="projects" className="flex items-center">
+                <ListFilter className="mr-2 h-4 w-4" />
+                Projects
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="dashboard" className="mt-0">
+              <DashboardSummary />
+            </TabsContent>
+
+            <TabsContent value="projects" className="mt-0">
+              {/* Statistics Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <Card className="bg-white dark:bg-slate-800 shadow-md hover:shadow-lg transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
+                    <Activity className="h-4 w-4 text-purple-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{projectStats.total}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {role === 'staff_drafter' ? 'Assigned to you' : 'All projects'}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white dark:bg-slate-800 shadow-md hover:shadow-lg transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+                    <Clock className="h-4 w-4 text-blue-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{projectStats.byStatus[PROJECT_STATUSES.IN_PROGRESS] || 0}</div>
+                    <p className="text-xs text-muted-foreground">Active projects</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white dark:bg-slate-800 shadow-md hover:shadow-lg transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Completed</CardTitle>
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{projectStats.byStatus[PROJECT_STATUSES.COMPLETED] || 0}</div>
+                    <p className="text-xs text-muted-foreground">Finished projects</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white dark:bg-slate-800 shadow-md hover:shadow-lg transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Attention Needed</CardTitle>
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{projectStats.overdue + projectStats.dueSoon}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {projectStats.overdue > 0 && `${projectStats.overdue} overdue`}
+                      {projectStats.overdue > 0 && projectStats.dueSoon > 0 && ', '}
+                      {projectStats.dueSoon > 0 && `${projectStats.dueSoon} due soon`}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card className="bg-white dark:bg-slate-800 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-xl text-slate-800 dark:text-slate-100">Project Overview</CardTitle>
+                  <CardDescription className="text-slate-600 dark:text-slate-400">Filter and manage your projects.</CardDescription>
+                  <ProjectFilters
+                      searchTerm={searchTerm}
+                      setSearchTerm={setSearchTerm}
+                      filterStatus={filterStatus}
+                      setFilterStatus={setFilterStatus}
                   />
-              )}
-            </CardContent>
-          </Card>
+                </CardHeader>
+                <CardContent>
+                  {filteredProjects.length === 0 ? (
+                      <div className="text-center py-10">
+                        <Zap className="mx-auto h-12 w-12 text-slate-400 dark:text-slate-500 mb-4" />
+                        <p className="text-slate-500 dark:text-slate-400">No projects found matching your criteria.</p>
+                      </div>
+                  ) : (
+                      <ProjectTable
+                          projects={filteredProjects}
+                          sortConfig={sortConfig}
+                          handleSort={handleSort}
+                          expandedProjectId={expandedProjectId}
+                          toggleExpandProject={toggleExpandProject}
+                          handleDeleteProject={handleDeleteProject}
+                          userRole={role}
+                          userId={user?.id}
+                          onProjectUpdate={fetchProjects}
+                      />
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </motion.div>
       </motion.div>
   );
