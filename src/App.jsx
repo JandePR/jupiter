@@ -18,6 +18,7 @@ import StaffProtectedRoute from '@/components/staff/StaffProtectedRoute';
 const StaffCreateProjectPage = React.lazy(() => import('@/pages/staff/StaffCreateProjectPage'));
 const StaffManageUsersPage = React.lazy(() => import('@/pages/staff/StaffManageUsersPage'));
 const StaffSettingsPage = React.lazy(() => import('@/pages/staff/StaffSettingsPage'));
+const ProjectDetailsPage = React.lazy(() => import('@/pages/staff/ProjectDetailsPage'));
 
 // Custom wrapper for routes that require either staff_admin or staff_manager
 function StaffManagerRoute({ children }) {
@@ -121,6 +122,19 @@ function AppContent() {
                         <StaffLayout>
                             <Suspense fallback={<LoadingFallback message="Loading Settings..." />}>
                                 <StaffSettingsPage />
+                            </Suspense>
+                        </StaffLayout>
+                    </StaffProtectedRoute>
+                }
+            />
+
+            <Route
+                path="/staff/projects/:projectId"
+                element={
+                    <StaffProtectedRoute requiredRolePrefix="staff">
+                        <StaffLayout>
+                            <Suspense fallback={<LoadingFallback message="Loading project details..." />}>
+                                <ProjectDetailsPage />
                             </Suspense>
                         </StaffLayout>
                     </StaffProtectedRoute>

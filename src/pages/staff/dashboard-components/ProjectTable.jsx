@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Eye, Edit3, Trash2, ChevronDown, ChevronUp, Save, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import ProjectDetailsCard from './ProjectDetailsCard';
 import { PROJECT_STATUSES, updateProjectStatus } from '../create-project-components/utils';
 import { useToast } from '@/components/ui/use-toast';
@@ -22,6 +23,7 @@ const ProjectTable = ({
                       }) => {
     const { user } = useAuth();
     const { toast } = useToast();
+    const navigate = useNavigate();
     const [editingStatusId, setEditingStatusId] = useState(null);
     const [tempStatus, setTempStatus] = useState('');
     const [isUpdating, setIsUpdating] = useState(false);
@@ -92,6 +94,16 @@ const ProjectTable = ({
         } finally {
             setIsUpdating(false);
         }
+    };
+
+    const handleViewProject = (projectId) => {
+        navigate(`/staff/projects/${projectId}`);
+    };
+
+    const handleEditProject = (projectId) => {
+        // Por ahora, navega a la página de detalles
+        // En el futuro, podrías tener una página de edición separada
+        navigate(`/staff/projects/${projectId}`);
     };
 
     const tableHeaders = [
@@ -209,8 +221,8 @@ const ProjectTable = ({
                                             className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(project.status)} ${canEditStatus(project) ? 'cursor-pointer hover:opacity-80' : ''}`}
                                             onClick={() => canEditStatus(project) && handleStatusEdit(project.id, project.status)}
                                         >
-                      {project.status}
-                    </span>
+                                            {project.status}
+                                        </span>
                                     )}
                                 </TableCell>
                                 <TableCell className="text-slate-600 dark:text-slate-300">{project.type || 'N/A'}</TableCell>
@@ -228,11 +240,23 @@ const ProjectTable = ({
                                 <TableCell className="text-slate-600 dark:text-slate-300">{formatDate(project.created_at)}</TableCell>
                                 <TableCell>
                                     <div className="flex space-x-1">
-                                        <Button variant="outline" size="icon" className="border-slate-300 hover:border-purple-500 hover:text-purple-500 dark:border-slate-600 dark:hover:border-purple-400 dark:hover:text-purple-400">
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={() => handleViewProject(project.id)}
+                                            className="border-slate-300 hover:border-purple-500 hover:text-purple-500 dark:border-slate-600 dark:hover:border-purple-400 dark:hover:text-purple-400"
+                                            title="View project details"
+                                        >
                                             <Eye className="h-4 w-4" />
                                         </Button>
                                         {(userRole === 'staff_admin' || (userRole === 'staff_drafter' && project.assigned_staff_id === userId)) && (
-                                            <Button variant="outline" size="icon" className="border-slate-300 hover:border-yellow-500 hover:text-yellow-500 dark:border-slate-600 dark:hover:border-yellow-400 dark:hover:text-yellow-400">
+                                            <Button
+                                                variant="outline"
+                                                size="icon"
+                                                onClick={() => handleEditProject(project.id)}
+                                                className="border-slate-300 hover:border-yellow-500 hover:text-yellow-500 dark:border-slate-600 dark:hover:border-yellow-400 dark:hover:text-yellow-400"
+                                                title="Edit project"
+                                            >
                                                 <Edit3 className="h-4 w-4" />
                                             </Button>
                                         )}
@@ -242,6 +266,7 @@ const ProjectTable = ({
                                                 size="icon"
                                                 onClick={() => handleDeleteProject(project.id)}
                                                 className="border-slate-300 hover:border-red-500 hover:text-red-500 dark:border-slate-600 dark:hover:border-red-400 dark:hover:text-red-400"
+                                                title="Delete project"
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
