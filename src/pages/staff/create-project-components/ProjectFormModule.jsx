@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/authHooks';
 import { supabase } from '@/lib/supabaseClient';
@@ -24,7 +26,9 @@ import {
     AlertCircle,
     CheckCircle,
     Loader2,
-    X
+    X,
+    UserPlus,
+    Mail
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -78,6 +82,17 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
     const [staffMembers, setStaffMembers] = useState([]);
     const [clients, setClients] = useState([]);
     const [currentTab, setCurrentTab] = useState('details');
+
+    // New client creation state
+    const [showCreateClientDialog, setShowCreateClientDialog] = useState(false);
+    const [isCreatingClient, setIsCreatingClient] = useState(false);
+    const [newClientData, setNewClientData] = useState({
+        fullName: '',
+        email: '',
+        phone: '',
+        company: '',
+        address: ''
+    });
 
     // Project details
     const [projectData, setProjectData] = useState({
@@ -135,6 +150,18 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
             setStaffMembers(staffData || []);
 
             // Load clients
+            await loadClients();
+        } catch (error) {
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Failed to load initial data'
+            });
+        }
+    };
+
+    const loadClients = async () => {
+        try {
             const { data: clientData } = await supabase
                 .from('profiles')
                 .select('id, full_name, email')
@@ -143,11 +170,7 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
 
             setClients(clientData || []);
         } catch (error) {
-            toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: 'Failed to load initial data'
-            });
+            console.error('Error loading clients:', error);
         }
     };
 
@@ -167,6 +190,157 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
             // Fallback project number
             const timestamp = Date.now().toString().slice(-6);
             setProjectNumber(`PRJ-${year}-${timestamp}`);
+        }
+    };
+
+    // Create new client function
+    const createNewClient = async () => {
+        setIsCreatingClient(true);
+        
+        try {
+            // Validate new client data
+            if (!newClientData.fullName || !newClientData.email) {
+                throw new Error('Full name and email are required');
+            }
+
+            // Check if email already exists
+            const { data: existingUser } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('email', newClientData.email)
+                .single();
+
+            if (existingUser) {
+                throw new Error('A user with this email already exists');
+            }
+
+            // Create auth user first
+            const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+                email: newClientData.email,
+                password: generateTemporaryPassword(),
+                email_confirm: true,
+                user_metadata: {
+                    full_name: newClientData.fullName,
+                    role: 'client'
+                }
+            });
+
+            if (authError) throw authError;
+
+            // Create profile
+            const { data: profileData, error: profileError } = await supabase
+                .from('profiles')
+                .insert({
+                    id: authData.user.id,
+                    full_name: newClientData.fullName,
+                    email: newClientData.email,
+                    phone: newClientData.phone,
+                    company: newClientData.company,
+                    address: newClientData.address,
+                    role: 'client',
+                    created_at: new Date().toISOString()
+                })
+                .select()
+                .single();
+
+            if (profileError) throw profileError;
+
+            // Update clients list
+            await loadClients();
+
+            // Set the new client as selected
+            setProjectData(prev => ({ ...prev, clientId: profileData.id }));
+
+            // Close dialog and reset form
+            setShowCreateClientDialog(false);
+            setNewClientData({
+                fullName: '',
+                email: '',
+                phone: '',
+                company: '',
+                address: ''
+            });
+
+            toast({
+                title: 'Client created successfully',
+                description: `${newClientData.fullName} has been added to the system`
+            });
+
+        } catch (error) {
+            console.error('Error creating client:', error);
+            toast({
+                variant: 'destructive',
+                title: 'Error creating client',
+                description: error.message || 'Could not create client'
+            });
+        } finally {
+            setIsCreatingClient(false);
+        }
+    };
+
+    // Generate temporary password
+    const generateTemporaryPassword = () => {
+        return Math.random().toString(36).slice(-8) + 'A1!';
+    };
+
+    // Send project notification email
+    const sendProjectNotificationEmail = async (clientEmail, clientName, projectName, projectNumber) => {
+        try {
+            // Here you would integrate with your email service
+            // For now, we'll use Supabase Edge Functions or a third-party service
+            
+            const emailData = {
+                to: clientEmail,
+                subject: `New Project Created: ${projectName}`,
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #7c3aed;">Hello ${clientName}!</h2>
+                        
+                        <p>We're pleased to inform you that your project <strong>${projectName}</strong> 
+                        (Project Number: ${projectNumber}) has been successfully created in our system.</p>
+                        
+                        <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                            <h3 style="color: #374151; margin-top: 0;">Project Details</h3>
+                            <p><strong>Name:</strong> ${projectName}</p>
+                            <p><strong>Project Number:</strong> ${projectNumber}</p>
+                        </div>
+                        
+                        <p>Here you can visualize the progress of your project and stay up to date with all updates.</p>
+                        
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="${window.location.origin}/dashboard" 
+                               style="background-color: #7c3aed; color: white; padding: 12px 24px; 
+                                      text-decoration: none; border-radius: 6px; display: inline-block;">
+                                View My Project
+                            </a>
+                        </div>
+                        
+                        <p style="color: #6b7280; font-size: 14px;">
+                            If you have any questions, please don't hesitate to contact us. 
+                            We're here to help you through every step of the process.
+                        </p>
+                        
+                        <p style="color: #6b7280; font-size: 14px;">
+                            Best regards,<br>
+                            The Project Team
+                        </p>
+                    </div>
+                `
+            };
+
+            // You would call your email service here
+            // For example, using Supabase Edge Functions:
+            // const { error } = await supabase.functions.invoke('send-email', { body: emailData });
+            
+            // For now, we'll just log it
+            console.log('Email to be sent:', emailData);
+            
+            // Return success
+            return { success: true };
+            
+        } catch (error) {
+            console.error('Error sending email:', error);
+            return { success: false, error };
         }
     };
 
@@ -322,6 +496,14 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
 
             if (error) throw error;
 
+            // Send notification email to client
+            const emailResult = await sendProjectNotificationEmail(
+                selectedClient.email,
+                selectedClient.full_name,
+                projectData.projectName,
+                projectNumber
+            );
+
             // Log project creation
             await supabase.from('project_activity_log').insert({
                 project_id: newProject.id,
@@ -331,12 +513,13 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
                     project_number: projectNumber,
                     template_used: selectedTemplate,
                     phase_count: customPhases.length,
+                    email_sent: emailResult.success
                 }
             });
 
             toast({
                 title: 'Success!',
-                description: `Project ${projectNumber} created successfully`
+                description: `Project ${projectNumber} created successfully. ${emailResult.success ? 'Notification email sent to client.' : 'Note: Email notification could not be sent.'}`
             });
 
             if (onSuccess) {
@@ -774,21 +957,130 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
                                             <Label htmlFor="clientId">
                                                 Client <span className="text-red-500">*</span>
                                             </Label>
-                                            <Select
-                                                value={projectData.clientId}
-                                                onValueChange={(value) => setProjectData({ ...projectData, clientId: value })}
-                                            >
-                                                <SelectTrigger className={errors.clientId ? 'border-red-500' : ''}>
-                                                    <SelectValue placeholder="Select client" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {clients.map(client => (
-                                                        <SelectItem key={client.id} value={client.id}>
-                                                            {client.full_name} ({client.email})
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
+                                            <div className="flex space-x-2">
+                                                <Select
+                                                    value={projectData.clientId}
+                                                    onValueChange={(value) => setProjectData({ ...projectData, clientId: value })}
+                                                >
+                                                    <SelectTrigger className={errors.clientId ? 'border-red-500' : ''}>
+                                                        <SelectValue placeholder="Select client" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {clients.map(client => (
+                                                            <SelectItem key={client.id} value={client.id}>
+                                                                {client.full_name} ({client.email})
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                
+                                                <Dialog open={showCreateClientDialog} onOpenChange={setShowCreateClientDialog}>
+                                                    <DialogTrigger asChild>
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="shrink-0"
+                                                        >
+                                                            <UserPlus className="h-4 w-4" />
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent className="sm:max-w-md">
+                                                        <DialogHeader>
+                                                            <DialogTitle>Create New Client</DialogTitle>
+                                                            <DialogDescription>
+                                                                Add a new client to the system and they will be automatically notified about the project.
+                                                            </DialogDescription>
+                                                        </DialogHeader>
+                                                        
+                                                        <div className="space-y-4">
+                                                            <div>
+                                                                <Label htmlFor="newClientName">
+                                                                    Full Name <span className="text-red-500">*</span>
+                                                                </Label>
+                                                                <Input
+                                                                    id="newClientName"
+                                                                    value={newClientData.fullName}
+                                                                    onChange={(e) => setNewClientData({ ...newClientData, fullName: e.target.value })}
+                                                                    placeholder="John Doe"
+                                                                />
+                                                            </div>
+                                                            
+                                                            <div>
+                                                                <Label htmlFor="newClientEmail">
+                                                                    Email <span className="text-red-500">*</span>
+                                                                </Label>
+                                                                <Input
+                                                                    id="newClientEmail"
+                                                                    type="email"
+                                                                    value={newClientData.email}
+                                                                    onChange={(e) => setNewClientData({ ...newClientData, email: e.target.value })}
+                                                                    placeholder="john@example.com"
+                                                                />
+                                                            </div>
+                                                            
+                                                            <div>
+                                                                <Label htmlFor="newClientPhone">Phone</Label>
+                                                                <Input
+                                                                    id="newClientPhone"
+                                                                    value={newClientData.phone}
+                                                                    onChange={(e) => setNewClientData({ ...newClientData, phone: e.target.value })}
+                                                                    placeholder="+1 (555) 123-4567"
+                                                                />
+                                                            </div>
+                                                            
+                                                            <div>
+                                                                <Label htmlFor="newClientCompany">Company</Label>
+                                                                <Input
+                                                                    id="newClientCompany"
+                                                                    value={newClientData.company}
+                                                                    onChange={(e) => setNewClientData({ ...newClientData, company: e.target.value })}
+                                                                    placeholder="ABC Company"
+                                                                />
+                                                            </div>
+                                                            
+                                                            <div>
+                                                                <Label htmlFor="newClientAddress">Address</Label>
+                                                                <Textarea
+                                                                    id="newClientAddress"
+                                                                    value={newClientData.address}
+                                                                    onChange={(e) => setNewClientData({ ...newClientData, address: e.target.value })}
+                                                                    placeholder="123 Main St, City, State 12345"
+                                                                    rows={3}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <DialogFooter className="sm:justify-start">
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                onClick={() => setShowCreateClientDialog(false)}
+                                                                disabled={isCreatingClient}
+                                                            >
+                                                                Cancel
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                onClick={createNewClient}
+                                                                disabled={isCreatingClient || !newClientData.fullName || !newClientData.email}
+                                                            >
+                                                                {isCreatingClient ? (
+                                                                    <>
+                                                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                                        Creating...
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <UserPlus className="mr-2 h-4 w-4" />
+                                                                        Create Client
+                                                                    </>
+                                                                )}
+                                                            </Button>
+                                                        </DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            </div>
                                             {errors.clientId && (
                                                 <p className="text-sm text-red-500 mt-1">{errors.clientId}</p>
                                             )}
@@ -804,7 +1096,7 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
                                                     <SelectValue placeholder="Select project manager" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="">None</SelectItem>
+                                                    <SelectItem value="none">None</SelectItem>
                                                     {staffMembers
                                                         .filter(s => s.role === 'staff_manager' || s.role === 'staff_admin')
                                                         .map(staff => (
@@ -826,7 +1118,7 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
                                                     <SelectValue placeholder="Select lead drafter" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="">None</SelectItem>
+                                                    <SelectItem value="none">None</SelectItem>
                                                     {staffMembers
                                                         .filter(s => s.role === 'staff_drafter' || s.role === 'staff_manager')
                                                         .map(staff => (

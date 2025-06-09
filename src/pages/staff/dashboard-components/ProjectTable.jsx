@@ -96,13 +96,21 @@ const ProjectTable = ({
         }
     };
 
-    const handleViewProject = (projectId) => {
+    const handleViewProject = (projectId, event) => {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        console.log('Viewing project:', projectId); // Add debugging
         navigate(`/staff/projects/${projectId}`);
     };
 
-    const handleEditProject = (projectId) => {
-        // Por ahora, navega a la página de detalles
-        // En el futuro, podrías tener una página de edición separada
+    const handleEditProject = (projectId, event) => {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        console.log('Editing project:', projectId); // Add debugging
         navigate(`/staff/projects/${projectId}`);
     };
 
@@ -243,7 +251,7 @@ const ProjectTable = ({
                                         <Button
                                             variant="outline"
                                             size="icon"
-                                            onClick={() => handleViewProject(project.id)}
+                                            onClick={(e) => handleViewProject(project.id, e)}
                                             className="border-slate-300 hover:border-purple-500 hover:text-purple-500 dark:border-slate-600 dark:hover:border-purple-400 dark:hover:text-purple-400"
                                             title="View project details"
                                         >
@@ -253,7 +261,7 @@ const ProjectTable = ({
                                             <Button
                                                 variant="outline"
                                                 size="icon"
-                                                onClick={() => handleEditProject(project.id)}
+                                                onClick={(e) => handleEditProject(project.id, e)}
                                                 className="border-slate-300 hover:border-yellow-500 hover:text-yellow-500 dark:border-slate-600 dark:hover:border-yellow-400 dark:hover:text-yellow-400"
                                                 title="Edit project"
                                             >

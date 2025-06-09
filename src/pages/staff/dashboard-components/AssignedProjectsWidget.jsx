@@ -83,6 +83,8 @@ const AssignedProjectsWidget = () => {
   };
 
   const handleNavigateToProject = (projectId) => {
+    // Add some debugging
+    console.log('Navigating to project:', projectId);
     navigate(`/staff/projects/${projectId}`);
   };
 
@@ -126,7 +128,11 @@ const AssignedProjectsWidget = () => {
               <div 
                 key={project.id} 
                 className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
-                onClick={() => handleNavigateToProject(project.id)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleNavigateToProject(project.id);
+                }}
               >
                 <div className="flex justify-between items-start mb-2">
                   <div className="font-medium">{project.project_name}</div>
