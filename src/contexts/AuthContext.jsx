@@ -18,7 +18,6 @@ export function AuthProvider({ children }) {
   const handleAuthChange = useCallback(async (_event, currentSession) => {
     console.log('AuthContext: handleAuthChange called with event:', _event);
     try {
-      setLoading(true);
       setSession(currentSession);
 
       if (currentSession?.user) {
@@ -40,6 +39,7 @@ export function AuthProvider({ children }) {
           user_metadata: {
             ...currentSession.user.user_metadata,
             name: userName,
+            role: userRole // Add role to user_metadata for consistency
           },
         });
         setRole(userRole);
@@ -57,9 +57,13 @@ export function AuthProvider({ children }) {
         setSession(null);
 
         if (_event === 'SIGNED_OUT' || _event === 'USER_DELETED' || _event === 'TOKEN_REFRESHED_FAILED') {
-          const currentPath = window.location.pathname;
-          const targetLoginPath = currentPath.startsWith('/staff') ? '/staff/login' : '/login';
-          if (currentPath !== targetLoginPath) {
+          const currentPath = location.pathname;
+          const isStaffRoute = currentPath.startsWith('/staff');
+          const targetLoginPath = isStaffRoute ? '/staff/login' : '/login';
+
+          // Don't redirect if already on a login/register page
+          const publicPaths = ['/login', '/register', '/staff/login'];
+          if (!publicPaths.includes(currentPath)) {
             console.log('AuthContext: Redirecting to login:', targetLoginPath);
             navigate(targetLoginPath, { replace: true });
           }
@@ -70,11 +74,8 @@ export function AuthProvider({ children }) {
       setUser(null);
       setRole(null);
       setSession(null);
-    } finally {
-      console.log('AuthContext: handleAuthChange complete, setting loading to false');
-      setLoading(false);
     }
-  }, [navigate, location.state]);
+  }, [navigate, location]);
 
   useEffect(() => {
     let isMounted = true;
@@ -112,9 +113,12 @@ export function AuthProvider({ children }) {
 
             if (isMounted) {
               setLoading(false);
-              const currentPath = window.location.pathname;
-              const targetLoginPath = currentPath.startsWith('/staff') ? '/staff/login' : '/login';
-              if (currentPath !== targetLoginPath && currentPath !== '/login' && currentPath !== '/register') {
+              const currentPath = location.pathname;
+              const isStaffRoute = currentPath.startsWith('/staff');
+              const targetLoginPath = isStaffRoute ? '/staff/login' : '/login';
+              const publicPaths = ['/login', '/register', '/staff/login'];
+
+              if (!publicPaths.includes(currentPath)) {
                 console.log('AuthContext: Redirecting to login due to invalid session');
                 navigate(targetLoginPath, { replace: true });
               }
@@ -141,6 +145,7 @@ export function AuthProvider({ children }) {
                 user_metadata: {
                   ...currentSession.user.user_metadata,
                   name: profile.full_name || currentSession.user.email,
+                  role: profile.role // Add role to metadata
                 },
               });
               setRole(profile.role || 'client');
@@ -234,19 +239,46 @@ export function AuthProvider({ children }) {
       if (error) {
         console.error('AuthContext: Registration failed:', error);
         toast({ variant: 'destructive', title: 'Registration Failed', description: error.message });
+        return false;
       } else if (data.user) {
         console.log('AuthContext: Registration successful');
-        if (data.user.identities?.length > 0 && data.user.identities.every(i => !i.identity_data?.email_verified) && !data.user.email_confirmed_at) {
-          toast({ title: 'Registration Successful', description: 'Please check your email to confirm your account.' });
-        } else {
-          toast({ title: 'Registration Successful', description: `Welcome, ${name}!` });
+
+        // Create profile immediately after registration
+        if (data.user.id) {
+          try {
+            const { error: profileError } = await supabase
+                .from('profiles')
+                .insert({
+                  id: data.user.id,
+                  full_name: name,
+                  email: email,
+                  role: 'client'
+                });
+
+            if (profileError && profileError.code !== '23505') { // Ignore duplicate key error
+              console.error('AuthContext: Error creating profile:', profileError);
+            }
+          } catch (profileErr) {
+            console.error('AuthContext: Exception creating profile:', profileErr);
+          }
         }
+
+        if (data.user.identities?.length > 0) {
+          toast({ title: 'Registration Successful', description: `Welcome, ${name}!` });
+          // Auto-login after registration
+          await login(email, password);
+        } else {
+          toast({ title: 'Registration Successful', description: 'Please check your email to confirm your account.' });
+        }
+        return true;
       } else {
         toast({ variant: 'destructive', title: 'Registration Failed', description: 'No user data returned after sign up.' });
+        return false;
       }
     } catch (e) {
       console.error('AuthContext: Registration exception:', e);
       toast({ variant: 'destructive', title: 'Registration Error', description: e.message });
+      return false;
     } finally {
       setLoading(false);
     }
@@ -262,6 +294,10 @@ export function AuthProvider({ children }) {
         toast({ variant: 'destructive', title: 'Logout Failed', description: error.message });
       } else {
         console.log('AuthContext: Logout successful');
+        // Clear local state immediately
+        setUser(null);
+        setSession(null);
+        setRole(null);
       }
     } catch (e) {
       console.error('AuthContext: Logout exception:', e);

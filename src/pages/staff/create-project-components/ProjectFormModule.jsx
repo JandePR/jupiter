@@ -23,7 +23,8 @@ import {
     Users,
     AlertCircle,
     CheckCircle,
-    Loader2
+    Loader2,
+    X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -76,6 +77,7 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
     const [customPhases, setCustomPhases] = useState([]);
     const [staffMembers, setStaffMembers] = useState([]);
     const [clients, setClients] = useState([]);
+    const [currentTab, setCurrentTab] = useState('details');
 
     // Project details
     const [projectData, setProjectData] = useState({
@@ -168,51 +170,95 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
         }
     };
 
-    const validateForm = () => {
+    const validateTab = (tabName) => {
         const newErrors = {};
 
-        if (!projectData.projectName.trim()) {
-            newErrors.projectName = 'Project name is required';
-        }
-        if (!projectData.projectType) {
-            newErrors.projectType = 'Project type is required';
-        }
-        if (!projectData.address.trim()) {
-            newErrors.address = 'Address is required';
-        }
-        if (!projectData.clientId) {
-            newErrors.clientId = 'Client selection is required';
-        }
-        if (!projectData.startDate) {
-            newErrors.startDate = 'Start date is required';
-        }
-        if (!projectData.deadline) {
-            newErrors.deadline = 'Deadline is required';
-        }
-        if (projectData.startDate && projectData.deadline) {
-            if (new Date(projectData.startDate) > new Date(projectData.deadline)) {
-                newErrors.deadline = 'Deadline must be after start date';
-            }
+        switch (tabName) {
+            case 'details':
+                if (!projectData.projectName.trim()) {
+                    newErrors.projectName = 'Project name is required';
+                }
+                if (!projectData.projectType) {
+                    newErrors.projectType = 'Project type is required';
+                }
+                if (!projectData.address.trim()) {
+                    newErrors.address = 'Address is required';
+                }
+                break;
+
+            case 'phases':
+                if (!projectData.startDate) {
+                    newErrors.startDate = 'Start date is required';
+                }
+                if (!projectData.deadline) {
+                    newErrors.deadline = 'Deadline is required';
+                }
+                if (projectData.startDate && projectData.deadline) {
+                    if (new Date(projectData.startDate) > new Date(projectData.deadline)) {
+                        newErrors.deadline = 'Deadline must be after start date';
+                    }
+                }
+                // Check if all phases have assigned staff
+                const unassignedPhases = customPhases.filter(phase => !phase.assignedStaffId);
+                if (unassignedPhases.length > 0) {
+                    newErrors.phases = `${unassignedPhases.length} phase(s) need staff assignment`;
+                }
+                break;
+
+            case 'team':
+                if (!projectData.clientId) {
+                    newErrors.clientId = 'Client selection is required';
+                }
+                break;
         }
 
-        // Validate phase assignments
-        const hasUnassignedPhases = customPhases.some(phase => !phase.assignedStaffId);
-        if (hasUnassignedPhases) {
-            newErrors.phases = 'All phases must have assigned staff';
-        }
+        return newErrors;
+    };
 
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+    const canProceedToNextTab = () => {
+        const tabErrors = validateTab(currentTab);
+        return Object.keys(tabErrors).length === 0;
+    };
+
+    const handleTabChange = (newTab) => {
+        const tabErrors = validateTab(currentTab);
+        if (Object.keys(tabErrors).length > 0) {
+            setErrors(tabErrors);
+            toast({
+                variant: 'destructive',
+                title: 'Validation Error',
+                description: 'Please fix the errors before proceeding'
+            });
+            return;
+        }
+        setErrors({});
+        setCurrentTab(newTab);
+    };
+
+    const validateForm = () => {
+        const allErrors = {
+            ...validateTab('details'),
+            ...validateTab('phases'),
+            ...validateTab('team')
+        };
+
+        setErrors(allErrors);
+        return Object.keys(allErrors).length === 0;
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
 
         if (!validateForm()) {
+            // Find the first tab with errors and switch to it
+            if (validateTab('details').length > 0) setCurrentTab('details');
+            else if (validateTab('phases').length > 0) setCurrentTab('phases');
+            else if (validateTab('team').length > 0) setCurrentTab('team');
+
             toast({
                 variant: 'destructive',
                 title: 'Validation Error',
-                description: 'Please fix the errors in the form'
+                description: 'Please fix all errors in the form'
             });
             return;
         }
@@ -223,6 +269,12 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
             // Calculate total estimated hours
             const totalEstimatedHours = customPhases.reduce((sum, phase) => sum + phase.estimatedHours, 0);
 
+            // Get client email
+            const selectedClient = clients.find(c => c.id === projectData.clientId);
+            if (!selectedClient) {
+                throw new Error('Selected client not found');
+            }
+
             // Prepare project data
             const projectPayload = {
                 project_number: projectNumber,
@@ -230,7 +282,7 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
                 type: projectData.projectType,
                 address: `${projectData.address}, ${projectData.city}, ${projectData.state} ${projectData.zipCode}`.trim(),
                 client_id: projectData.clientId,
-                client_email: clients.find(c => c.id === projectData.clientId)?.email,
+                client_email: selectedClient.email,
                 project_manager_id: projectData.projectManagerId || null,
                 lead_drafter_id: projectData.leadDrafterId || null,
                 start_date: projectData.startDate,
@@ -355,11 +407,26 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
 
                 <CardContent>
                     <form onSubmit={handleSubmit}>
-                        <Tabs defaultValue="details" className="w-full">
+                        <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
                             <TabsList className="grid w-full grid-cols-3">
-                                <TabsTrigger value="details">Project Details</TabsTrigger>
-                                <TabsTrigger value="phases">Phases & Timeline</TabsTrigger>
-                                <TabsTrigger value="team">Team & Notes</TabsTrigger>
+                                <TabsTrigger value="details">
+                                    Project Details
+                                    {Object.keys(validateTab('details')).length > 0 && (
+                                        <AlertCircle className="ml-2 h-4 w-4 text-red-500" />
+                                    )}
+                                </TabsTrigger>
+                                <TabsTrigger value="phases">
+                                    Phases & Timeline
+                                    {Object.keys(validateTab('phases')).length > 0 && (
+                                        <AlertCircle className="ml-2 h-4 w-4 text-red-500" />
+                                    )}
+                                </TabsTrigger>
+                                <TabsTrigger value="team">
+                                    Team & Notes
+                                    {Object.keys(validateTab('team')).length > 0 && (
+                                        <AlertCircle className="ml-2 h-4 w-4 text-red-500" />
+                                    )}
+                                </TabsTrigger>
                             </TabsList>
 
                             <TabsContent value="details" className="space-y-6 mt-6">
@@ -432,6 +499,9 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
                                                 placeholder="123 Main Street"
                                                 className={errors.address ? 'border-red-500' : ''}
                                             />
+                                            {errors.address && (
+                                                <p className="text-sm text-red-500 mt-1">{errors.address}</p>
+                                            )}
                                         </div>
 
                                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -551,6 +621,9 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
                                                 onChange={(e) => setProjectData({ ...projectData, startDate: e.target.value })}
                                                 className={errors.startDate ? 'border-red-500' : ''}
                                             />
+                                            {errors.startDate && (
+                                                <p className="text-sm text-red-500 mt-1">{errors.startDate}</p>
+                                            )}
                                         </div>
                                         <div>
                                             <Label htmlFor="deadline">
@@ -562,6 +635,7 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
                                                 value={projectData.deadline}
                                                 onChange={(e) => setProjectData({ ...projectData, deadline: e.target.value })}
                                                 className={errors.deadline ? 'border-red-500' : ''}
+                                                min={projectData.startDate}
                                             />
                                             {errors.deadline && (
                                                 <p className="text-sm text-red-500 mt-1">{errors.deadline}</p>
@@ -597,27 +671,31 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
                                                 <div className="space-y-4">
                                                     <div className="flex items-start justify-between">
                                                         <div className="flex items-center space-x-2">
-                              <span className="flex items-center justify-center h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-semibold text-sm">
-                                {index + 1}
-                              </span>
+                                                            <span className="flex items-center justify-center h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-semibold text-sm">
+                                                                {index + 1}
+                                                            </span>
                                                             <div className="flex-1">
                                                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                                                     <Input
-                                                                        placeholder="Phase name"
+                                                                        placeholder="Phase name *"
                                                                         value={phase.name}
                                                                         onChange={(e) => updatePhase(phase.id, { name: e.target.value })}
+                                                                        className={!phase.name ? 'border-orange-500' : ''}
                                                                     />
                                                                     <Input
-                                                                        placeholder="Code (e.g., PD)"
+                                                                        placeholder="Code (e.g., PD) *"
                                                                         value={phase.code}
-                                                                        onChange={(e) => updatePhase(phase.id, { code: e.target.value })}
-                                                                        className="w-full md:w-24"
+                                                                        onChange={(e) => updatePhase(phase.id, { code: e.target.value.toUpperCase() })}
+                                                                        className={`w-full md:w-24 ${!phase.code ? 'border-orange-500' : ''}`}
+                                                                        maxLength={3}
                                                                     />
                                                                     <Input
                                                                         type="number"
-                                                                        placeholder="Est. hours"
+                                                                        placeholder="Est. hours *"
                                                                         value={phase.estimatedHours}
                                                                         onChange={(e) => updatePhase(phase.id, { estimatedHours: parseInt(e.target.value) || 0 })}
+                                                                        min="0"
+                                                                        className={phase.estimatedHours === 0 ? 'border-orange-500' : ''}
                                                                     />
                                                                 </div>
                                                             </div>
@@ -628,6 +706,7 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
                                                             size="icon"
                                                             onClick={() => removePhase(phase.id)}
                                                             className="text-red-500 hover:text-red-700"
+                                                            disabled={customPhases.length <= 1}
                                                         >
                                                             <X className="h-4 w-4" />
                                                         </Button>
@@ -638,8 +717,8 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
                                                             value={phase.assignedStaffId}
                                                             onValueChange={(value) => updatePhase(phase.id, { assignedStaffId: value })}
                                                         >
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Assign staff" />
+                                                            <SelectTrigger className={!phase.assignedStaffId ? 'border-orange-500' : ''}>
+                                                                <SelectValue placeholder="Assign staff *" />
                                                             </SelectTrigger>
                                                             <SelectContent>
                                                                 {staffMembers.map(staff => (
@@ -655,6 +734,8 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
                                                             placeholder="Start date"
                                                             value={phase.startDate}
                                                             onChange={(e) => updatePhase(phase.id, { startDate: e.target.value })}
+                                                            min={projectData.startDate}
+                                                            max={projectData.deadline}
                                                         />
 
                                                         <Input
@@ -662,6 +743,8 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
                                                             placeholder="End date"
                                                             value={phase.endDate}
                                                             onChange={(e) => updatePhase(phase.id, { endDate: e.target.value })}
+                                                            min={phase.startDate || projectData.startDate}
+                                                            max={projectData.deadline}
                                                         />
                                                     </div>
 
@@ -706,6 +789,9 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
                                                     ))}
                                                 </SelectContent>
                                             </Select>
+                                            {errors.clientId && (
+                                                <p className="text-sm text-red-500 mt-1">{errors.clientId}</p>
+                                            )}
                                         </div>
 
                                         <div>
@@ -781,22 +867,22 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
                                             <div>
                                                 <span className="text-slate-600 dark:text-slate-400">Total Estimated Hours:</span>
                                                 <span className="ml-2 font-semibold">
-                          {customPhases.reduce((sum, phase) => sum + phase.estimatedHours, 0)}
-                        </span>
+                                                    {customPhases.reduce((sum, phase) => sum + phase.estimatedHours, 0)}
+                                                </span>
                                             </div>
                                             <div>
                                                 <span className="text-slate-600 dark:text-slate-400">Duration:</span>
                                                 <span className="ml-2 font-semibold">
-                          {projectData.startDate && projectData.deadline
-                              ? `${Math.ceil((new Date(projectData.deadline) - new Date(projectData.startDate)) / (1000 * 60 * 60 * 24))} days`
-                              : 'Not set'}
-                        </span>
+                                                    {projectData.startDate && projectData.deadline
+                                                        ? `${Math.ceil((new Date(projectData.deadline) - new Date(projectData.startDate)) / (1000 * 60 * 60 * 24))} days`
+                                                        : 'Not set'}
+                                                </span>
                                             </div>
                                             <div>
                                                 <span className="text-slate-600 dark:text-slate-400">Team Size:</span>
                                                 <span className="ml-2 font-semibold">
-                          {new Set(customPhases.map(p => p.assignedStaffId).filter(Boolean)).size} members
-                        </span>
+                                                    {new Set(customPhases.map(p => p.assignedStaffId).filter(Boolean)).size} members
+                                                </span>
                                             </div>
                                         </div>
 
@@ -807,15 +893,15 @@ const ProjectFormModule = ({ onSuccess, onCancel }) => {
                                                     <>
                                                         <CheckCircle className="h-5 w-5 text-green-500" />
                                                         <span className="text-sm text-green-600 dark:text-green-400">
-                              All phases have assigned staff
-                            </span>
+                                                            All phases have assigned staff
+                                                        </span>
                                                     </>
                                                 ) : (
                                                     <>
                                                         <AlertCircle className="h-5 w-5 text-yellow-500" />
                                                         <span className="text-sm text-yellow-600 dark:text-yellow-400">
-                              {customPhases.filter(p => !p.assignedStaffId).length} phases need staff assignment
-                            </span>
+                                                            {customPhases.filter(p => !p.assignedStaffId).length} phases need staff assignment
+                                                        </span>
                                                     </>
                                                 )}
                                             </div>
